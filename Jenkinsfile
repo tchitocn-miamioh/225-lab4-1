@@ -22,12 +22,14 @@ pipeline {
             }
         }
 
-        stage('Python Application Tests') {
+        stage('Python Application Tests - Pytest') {
             steps {
                 script {
-                    docker.image('python:3.9-slim').inside {
+                    docker.image('python:3.9-slim').inside('-u 0:0') {
                         sh '''
-                            python -m pip install --disable-pip-version-check -q -r requirements.txt pytest
+                            python -m pip install --no-cache-dir \
+                              -r requirements.txt pytest
+
                             python -m pytest -v tests/
                         '''
                     }
@@ -38,9 +40,10 @@ pipeline {
         stage('Python Security Scan - Bandit') {
             steps {
                 script {
-                    docker.image('python:3.9-slim').inside {
+                    docker.image('python:3.9-slim').inside('-u 0:0') {
                         sh '''
-                            python -m pip install --disable-pip-version-check -q bandit
+                            python -m pip install --no-cache-dir bandit
+
                             bandit -r main.py -ll -ii
                         '''
                     }
@@ -51,9 +54,10 @@ pipeline {
         stage('Dependency Security Scan - pip-audit') {
             steps {
                 script {
-                    docker.image('python:3.9-slim').inside {
+                    docker.image('python:3.9-slim').inside('-u 0:0') {
                         sh '''
-                            python -m pip install --disable-pip-version-check -q pip-audit
+                            python -m pip install --no-cache-dir pip-audit
+
                             python -m pip_audit -r requirements.txt
                         '''
                     }
@@ -96,7 +100,9 @@ pipeline {
                     )
                 ]) {
                     sh '''
-                        sed -i "s|${DOCKER_IMAGE}:latest|${DOCKER_IMAGE}:${IMAGE_TAG}|" deployment-dev.yaml
+                        sed -i \
+                          "s|${DOCKER_IMAGE}:latest|${DOCKER_IMAGE}:${IMAGE_TAG}|" \
+                          deployment-dev.yaml
 
                         kubectl apply -f deployment-dev.yaml
 
@@ -129,18 +135,24 @@ pipeline {
 
     post {
         success {
-            slackSend color: "good",
+            slackSend(
+                color: "good",
                 message: "Build Completed: ${env.JOB_NAME} ${env.BUILD_NUMBER}"
+            )
         }
 
         unstable {
-            slackSend color: "warning",
+            slackSend(
+                color: "warning",
                 message: "Build Unstable: ${env.JOB_NAME} ${env.BUILD_NUMBER}"
+            )
         }
 
         failure {
-            slackSend color: "danger",
+            slackSend(
+                color: "danger",
                 message: "Build Failed: ${env.JOB_NAME} ${env.BUILD_NUMBER}"
+            )
         }
     }
 }
