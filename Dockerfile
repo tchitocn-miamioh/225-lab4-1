@@ -1,20 +1,34 @@
+
 FROM python:3.9-slim
 
-# Install dependencies
-RUN apt-get clean && apt-get -y update && apt-get -y install nginx python3-dev build-essential nfs-common && rm -rf /var/lib/apt/lists/*
+# Install required system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        nfs-common && \
+    rm -rf /var/lib/apt/lists/*
 
-# Create mount point for NFS
+# Set application working directory
+WORKDIR /app
+
+# Create mount point for persistent storage
 RUN mkdir -p /nfs
 
+# Copy Python dependencies
+COPY requirements.txt .
+
+# Install Flask and Gunicorn
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
 COPY . .
 
-# Install Python dependencies
-RUN pip install -r requirements.txt
+# Configure application environment
+ENV PORT=5000
+ENV DATABASE_PATH=/nfs/demo.db
+ENV PYTHONUNBUFFERED=1
 
-# Expose port 5000 for the application
+# Expose application port
 EXPOSE 5000
 
-# Command to run the application
-CMD ["python3", "main.py"]
+# Initialize SQLite database and start Gunicorn
+CMD ["sh", "-c", "python -c 'from main import init_db; init_db()' && exec gunicorn --bind 0.0.0.0:5000 --workers 1 main:app"]
