@@ -7,6 +7,8 @@ pipeline {
         DOCKER_IMAGE = 'cithit/tchitocn'
         IMAGE_TAG = "build-${BUILD_NUMBER}"
         GITHUB_URL = 'https://github.com/tchitocn-miamioh/225-lab4-1.git'
+        KUBECONFIG = credentials('tchitocn-225')                                                         //<------change this
+
     }
 
     stages {
