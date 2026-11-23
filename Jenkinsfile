@@ -7,7 +7,6 @@ pipeline {
         DOCKER_IMAGE = 'cithit/tchitocn'
         IMAGE_TAG = "build-${BUILD_NUMBER}"
         GITHUB_URL = 'https://github.com/tchitocn-miamioh/225-lab4-1.git'
-
     }
 
     stages {
@@ -15,6 +14,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 cleanWs()
+
                 checkout([
                     $class: 'GitSCM',
                     branches: [[name: '*/main']],
@@ -92,6 +92,31 @@ pipeline {
             }
         }
 
+        stage('Test Kubernetes Connection') {
+            steps {
+                withCredentials([
+                    file(
+                        credentialsId: 'tchitocn-225',
+                        variable: 'KUBECONFIG'
+                    )
+                ]) {
+                    sh '''
+                        echo "Checking Kubernetes connection..."
+
+                        kubectl config current-context
+
+                        kubectl cluster-info
+
+                        kubectl get nodes
+
+                        kubectl get pods -n default
+
+                        echo "Kubernetes connection test passed."
+                    '''
+                }
+            }
+        }
+
         stage('Deploy to Dev Environment') {
             steps {
                 withCredentials([
@@ -101,11 +126,17 @@ pipeline {
                     )
                 ]) {
                     sh '''
+                        echo "Updating Docker image tag..."
+
                         sed -i \
                           "s|${DOCKER_IMAGE}:latest|${DOCKER_IMAGE}:${IMAGE_TAG}|" \
                           deployment-dev.yaml
 
+                        echo "Deploying to Kubernetes..."
+
                         kubectl apply -f deployment-dev.yaml
+
+                        echo "Waiting for Flask deployment..."
 
                         kubectl rollout status \
                           deployment/flask-deployment \
@@ -125,9 +156,21 @@ pipeline {
                     )
                 ]) {
                     sh '''
+                        echo "Checking Kubernetes deployments..."
                         kubectl get deployments -n default
+
+                        echo "Checking running pods..."
                         kubectl get pods -n default
+
+                        echo "Checking Flask service..."
                         kubectl get svc flask-service -n default
+
+                        echo "Checking deployment image..."
+                        kubectl get deployment flask-deployment \
+                          -n default \
+                          -o jsonpath='{.spec.template.spec.containers[*].image}'
+
+                        echo ""
                     '''
                 }
             }
